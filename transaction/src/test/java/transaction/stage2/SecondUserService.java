@@ -39,7 +39,7 @@ public class SecondUserService {
         return TransactionSynchronizationManager.getCurrentTransactionName();
     }
 
-    @Transactional(propagation = Propagation.MANDATORY)
+    //@Transactional(propagation = Propagation.MANDATORY)
     public String saveSecondTransactionWithMandatory() {
         userRepository.save(User.createTest());
         logActualTransactionActive();
