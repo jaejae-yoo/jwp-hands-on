@@ -14,6 +14,9 @@ public class TransactionPointcut extends StaticMethodMatcherPointcut {
 
     @Override
     public boolean matches(final Method method, final Class<?> targetClass) {
+        if (method.getName().equals("changePassword")) {
+            return true;
+        }
         return false;
     }
 }

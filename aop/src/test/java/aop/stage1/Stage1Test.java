@@ -5,10 +5,12 @@ import aop.StubUserHistoryDao;
 import aop.domain.User;
 import aop.repository.UserDao;
 import aop.repository.UserHistoryDao;
+import aop.service.AppUserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -41,11 +43,18 @@ class Stage1Test {
 
     @Test
     void testChangePassword() {
-        final UserService userService = null;
+        final UserService userService = new UserService(userDao, userHistoryDao);
+        final ProxyFactory proxyFactory = new ProxyFactory(userService);
+
+        final TransactionAdvisor transactionAdvisor = new TransactionAdvisor(new TransactionPointcut(),
+                new TransactionAdvice(platformTransactionManager));
+
+        proxyFactory.addAdvisor(transactionAdvisor);
+        final UserService proxy = (UserService) proxyFactory.getProxy();
 
         final var newPassword = "qqqqq";
         final var createBy = "gugu";
-        userService.changePassword(1L, newPassword, createBy);
+        proxy.changePassword(1L, newPassword, createBy);
 
         final var actual = userService.findById(1L);
 
@@ -54,14 +63,21 @@ class Stage1Test {
 
     @Test
     void testTransactionRollback() {
-        final UserService userService = null;
+        final UserService userService = new UserService(userDao, stubUserHistoryDao);
+        final ProxyFactory proxyFactory = new ProxyFactory(userService);
+
+        final TransactionAdvisor transactionAdvisor = new TransactionAdvisor(new TransactionPointcut(),
+                new TransactionAdvice(platformTransactionManager));
+
+        proxyFactory.addAdvisor(transactionAdvisor);
+        final UserService proxy = (UserService) proxyFactory.getProxy();
 
         final var newPassword = "newPassword";
         final var createBy = "gugu";
         assertThrows(DataAccessException.class,
-                () -> userService.changePassword(1L, newPassword, createBy));
+                () -> proxy.changePassword(1L, newPassword, createBy));
 
-        final var actual = userService.findById(1L);
+        final var actual = proxy.findById(1L);
 
         assertThat(actual.getPassword()).isNotEqualTo(newPassword);
     }
