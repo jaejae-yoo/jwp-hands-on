@@ -7,6 +7,7 @@ import aop.repository.UserDao;
 import aop.repository.UserHistoryDao;
 import aop.service.AppUserService;
 import aop.service.UserService;
+import java.lang.reflect.Proxy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -45,13 +46,18 @@ class Stage0Test {
     @Test
     void testChangePassword() {
         final var appUserService = new AppUserService(userDao, userHistoryDao);
-        final UserService userService = null;
+        final TransactionHandler transactionHandler = new TransactionHandler(platformTransactionManager, appUserService);
+
+        // 동적 프록시 생성
+        // 클래스 로더 정보, 인터페이스, 핸들러 로직 -> 해당 인터페이를 기반으로 동적 프록시를 생성후, 결과를 반환한다.
+        final UserService proxy = (UserService) Proxy.newProxyInstance(UserService.class.getClassLoader(),
+                new Class[]{UserService.class}, transactionHandler);
 
         final var newPassword = "qqqqq";
         final var createBy = "gugu";
-        userService.changePassword(1L, newPassword, createBy);
+        proxy.changePassword(1L, newPassword, createBy);
 
-        final var actual = userService.findById(1L);
+        final var actual = proxy.findById(1L);
 
         assertThat(actual.getPassword()).isEqualTo(newPassword);
     }
@@ -59,14 +65,17 @@ class Stage0Test {
     @Test
     void testTransactionRollback() {
         final var appUserService = new AppUserService(userDao, stubUserHistoryDao);
-        final UserService userService = null;
+        final TransactionHandler transactionHandler = new TransactionHandler(platformTransactionManager, appUserService);
+
+        final UserService proxy = (UserService) Proxy.newProxyInstance(UserService.class.getClassLoader(),
+                new Class[]{UserService.class}, transactionHandler);
 
         final var newPassword = "newPassword";
         final var createBy = "gugu";
         assertThrows(DataAccessException.class,
-                () -> userService.changePassword(1L, newPassword, createBy));
+                () -> proxy.changePassword(1L, newPassword, createBy));
 
-        final var actual = userService.findById(1L);
+        final var actual = proxy.findById(1L);
 
         assertThat(actual.getPassword()).isNotEqualTo(newPassword);
     }
